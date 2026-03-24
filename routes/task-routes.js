@@ -3,14 +3,11 @@ const taskAPI = require('../controller/task-ctrl');
 
 const router = express.Router();
 
-
-
-
-router.get('/tasks', taskAPI.getTasks);
-router.get('/tasks/priority/:level', taskAPI.getTasksByPriority);
-router.get('/tasks/:id', taskAPI.getTaskById);
-router.post('/tasks', taskAPI.createTask);
-router.put('/tasks/:id',taskAPI.updateTask);
-router.delete('/tasks/:id',taskAPI.deleteTask);
+router.get('/', taskAPI.getTasks);
+router.get('/priority/:level', taskAPI.getTasksByPriority);
+router.get('/:id', taskAPI.getTaskById);
+router.post('/', taskAPI.createTask);
+router.put('/:id', taskAPI.updateTask);
+router.delete('/:id', taskAPI.deleteTask);
 
 module.exports = router;

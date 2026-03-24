@@ -7,6 +7,27 @@ const tasks = taskStore.tasks;
 const taskApi = {};
 const allowedPriorities = ['low', 'medium', 'high'];
 
+const persistTasks = () => {
+    try {
+        fs.writeFileSync(dataFilePath, JSON.stringify({ tasks }, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Failed to write tasks to file:', error);
+        return false;
+    }
+};
+
+const getNextTaskId = () => {
+    const usedIds = new Set(tasks.map((task) => Number(task.id)));
+    let nextId = Math.max(0, ...usedIds) + 1;
+
+    while (usedIds.has(nextId)) {
+        nextId += 1;
+    }
+
+    return nextId;
+};
+
 const formatDate = (date) => {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -33,12 +54,13 @@ const isValidPriority = (value) => {
 taskApi.getTasks = (req, res) => {
     const sortedTasks = sortByCreatedDateDesc(tasks);
 
-    if (req.query.completed){
+    if (req.query.completed) {
         const isCompleted=req.query.completed.toLowerCase() === 'true';
-        const filteredTasks=sortedTasks.filter((t)=>t.completed===isCompleted);
+        const filteredTasks = sortedTasks.filter((t) => t.completed === isCompleted);
         return res.status(200).json(filteredTasks);
     }
-	return res.status(200).json(sortedTasks);
+
+    return res.status(200).json(sortedTasks);
 };
 
 taskApi.getTasksByPriority = (req, res) => {
@@ -54,7 +76,6 @@ taskApi.getTasksByPriority = (req, res) => {
 
 
 taskApi.getTaskById = (req, res) => {
-    
     const id = Number(req.params.id);
     const task = tasks.find((t) => t.id === id);
 
@@ -65,79 +86,96 @@ taskApi.getTaskById = (req, res) => {
     return res.status(200).json(task);
 };
 
-taskApi.createTask = (req,res)=>{
-    if(!req.body.title){
-        return res.status(400).json({message:"Title is required"});
+taskApi.createTask = (req, res) => {
+    if (!req.body.title) {
+        return res.status(400).json({ message: 'Title is required' });
     }
-    if(!req.body.description){
-        return res.status(400).json({message:"Description is required"});
+
+    if (!req.body.description) {
+        return res.status(400).json({ message: 'Description is required' });
     }
-    if("completed" in req.body && typeof req.body.completed !== 'boolean'){
-        return res.status(400).json({message:"Completed must be a boolean value"});
+
+    if ('completed' in req.body && typeof req.body.completed !== 'boolean') {
+        return res.status(400).json({ message: 'Completed must be a boolean value' });
     }
-    if("priority" in req.body && !isValidPriority(req.body.priority)){
-        return res.status(400).json({message:"Priority must be low, medium, or high"});
+
+    if ('priority' in req.body && !isValidPriority(req.body.priority)) {
+        return res.status(400).json({ message: 'Priority must be low, medium, or high' });
     }
-    const maxId = tasks.reduce((acc, task) => Math.max(acc, task.id), 0);
+
     const newTask = {
-        id: maxId + 1,
+        id: getNextTaskId(),
         title: req.body.title,
         description: req.body.description,
-        completed: "completed" in req.body ? req.body.completed : false,
+        completed: 'completed' in req.body ? req.body.completed : false,
         createdDate: formatDate(new Date()),
-        priority: "priority" in req.body ? String(req.body.priority).toLowerCase() : 'medium'
+        priority: 'priority' in req.body ? String(req.body.priority).toLowerCase() : 'medium'
     };
-    tasks.push(newTask);
-    fs.writeFileSync(dataFilePath, JSON.stringify({ tasks }, null, 2));
-    return res.status(201).json(newTask);
-}
 
-taskApi.updatetask = (req,res)=>{
-    if(!req.params.id){
-        return res.status(400).json({message:"Task ID is required"});
+    tasks.push(newTask);
+
+    if (!persistTasks()) {
+        tasks.pop();
+        return res.status(500).json({ message: 'Failed to save task' });
     }
-    const id=Number(req.params.id);
+
+    return res.status(201).json(newTask);
+};
+
+taskApi.updateTask = (req, res) => {
+    if (!req.params.id) {
+        return res.status(400).json({ message: 'Task ID is required' });
+    }
+
+    const id = Number(req.params.id);
     const task = tasks.find((t) => t.id === id);
+
     if (!task) {
         return res.status(404).json({ message: 'Task not found' });
     }
-    if(!req.body.title || !req.body.description){
-        return res.status(400).json({message:"Title and Description are required"});
-    }
-    if("completed" in req.body && typeof req.body.completed !== 'boolean'){
-        return res.status(400).json({message:"Completed must be a boolean value"});
-    }
-    if("priority" in req.body && !isValidPriority(req.body.priority)){
-        return res.status(400).json({message:"Priority must be low, medium, or high"});
+
+    if (!req.body.title || !req.body.description) {
+        return res.status(400).json({ message: 'Title and Description are required' });
     }
 
-    const title=req.body.title;
-    const description=req.body.description;
-    const completed="completed" in req.body ? req.body.completed : task.completed;
-    const priority="priority" in req.body ? String(req.body.priority).toLowerCase() : task.priority;
-    task.title=title;
-    task.description=description;
-    task.completed=completed;
-    task.priority=priority;
-    fs.writeFileSync(dataFilePath, JSON.stringify({ tasks }, null, 2));
+    if ('completed' in req.body && typeof req.body.completed !== 'boolean') {
+        return res.status(400).json({ message: 'Completed must be a boolean value' });
+    }
+
+    if ('priority' in req.body && !isValidPriority(req.body.priority)) {
+        return res.status(400).json({ message: 'Priority must be low, medium, or high' });
+    }
+
+    task.title = req.body.title;
+    task.description = req.body.description;
+    task.completed = 'completed' in req.body ? req.body.completed : task.completed;
+    task.priority = 'priority' in req.body ? String(req.body.priority).toLowerCase() : task.priority;
+
+    if (!persistTasks()) {
+        return res.status(500).json({ message: 'Failed to update task' });
+    }
+
     return res.status(200).json(task);
+};
 
-}
+taskApi.deleteTask = (req, res) => {
+    const id = Number(req.params.id);
+    const task = tasks.find((t) => t.id === id);
 
-taskApi.updateTask = taskApi.updatetask;
-
-taskApi.deleteTask = (req,res)=>{
-    const id=Number(req.params.id);
-    const task=tasks.find((t)=>t.id===id);
-    if(!task){
-        return res.status(404).json({message:"Task not found"});
+    if (!task) {
+        return res.status(404).json({ message: 'Task not found' });
     }
-    const index=tasks.indexOf(task);
-    tasks.splice(index,1);
-    fs.writeFileSync(dataFilePath, JSON.stringify({ tasks }, null, 2));
-    return res.status(200).json({message:"Task deleted successfully"});
 
-}
+    const index = tasks.indexOf(task);
+    const [deletedTask] = tasks.splice(index, 1);
+
+    if (!persistTasks()) {
+        tasks.splice(index, 0, deletedTask);
+        return res.status(500).json({ message: 'Failed to delete task' });
+    }
+
+    return res.status(200).json({ message: 'Task deleted successfully' });
+};
 
 module.exports = taskApi;
 

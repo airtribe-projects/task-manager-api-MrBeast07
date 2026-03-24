@@ -5,7 +5,7 @@ const taskRoutes = require('./routes/task-routes');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(taskRoutes);
+app.use('/tasks', taskRoutes);
 
 if (require.main === module) {
     app.listen(port, (err) => {
