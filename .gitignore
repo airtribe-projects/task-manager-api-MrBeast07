@@ -1,2 +1,4 @@
 /node_modules
 /.tap
+/.postman
+postman/globals/workspace.globals.yaml
